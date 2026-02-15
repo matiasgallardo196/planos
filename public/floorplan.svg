@@ -1,0 +1,13 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="600" fill="#f0f0f0" />
+  <rect x="50" y="50" width="100" height="100" fill="white" stroke="black" stroke-width="2" />
+  <text x="100" y="100" font-family="Arial" font-size="20" text-anchor="middle" dominant-baseline="middle">Room 7</text>
+  
+  <rect x="150" y="50" width="100" height="100" fill="white" stroke="black" stroke-width="2" />
+  <text x="200" y="100" font-family="Arial" font-size="20" text-anchor="middle" dominant-baseline="middle">Room 8</text>
+
+  <rect x="50" y="200" width="200" height="50" fill="#e0e0e0" stroke="black" />
+  <text x="150" y="230" font-family="Arial" font-size="20" text-anchor="middle">Corridor</text>
+  
+  <text x="400" y="300" font-family="Arial" font-size="24" text-anchor="middle" fill="#666">Placeholder Floor Plan</text>
+</svg>
