@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { Room, RoomState, Polygon, Point } from "@/lib/storage";
 import PolygonEditor from "./PolygonEditor";
 import { clsx } from "clsx";
+import { Pencil, Plus } from "lucide-react";
 
 interface FloorPlanProps {
   imageSrc: string;
@@ -14,6 +15,7 @@ interface FloorPlanProps {
   editMode: boolean; // boolean: true = EDIT, false = VIEW
   onPolygonSave: (points: Point[]) => void;
   onRoomSelect: (roomId: string) => void;
+  onBackgroundClick?: () => void;
 }
 
 export default function FloorPlan({
@@ -25,9 +27,11 @@ export default function FloorPlan({
   editMode,
   onPolygonSave,
   onRoomSelect,
+  onBackgroundClick,
 }: FloorPlanProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [drawingMode, setDrawingMode] = useState(false);
 
   // Handle resizing to keep SVG in sync with Image
   useEffect(() => {
@@ -50,25 +54,47 @@ export default function FloorPlan({
     return () => window.removeEventListener("resize", updateDimensions);
   }, [imageSrc]);
 
+  // Reset drawing mode when room selection changes or edit mode changes
+  useEffect(() => {
+    setDrawingMode(false);
+  }, [selectedRoomId, editMode]);
+
 
   const getPolygonColor = (roomId: string) => {
     const isSelected = selectedRoomId === roomId;
     const state = states.find(s => s.roomId === roomId)?.status || "FREE";
     
-    if (isSelected) return "rgba(59, 130, 246, 0.5)"; // Blue
+    if (isSelected) return "rgba(59, 130, 246, 0.6)"; // Blue (Selected)
     
     switch (state) {
-      case "OCCUPIED": return "rgba(34, 197, 94, 0.4)"; // Green
-      case "OOS": return "rgba(234, 179, 8, 0.4)"; // Yellow
-      case "FREE": return "rgba(255, 255, 255, 0.1)"; // Almost transparent
+      case "FREE": return "rgba(34, 197, 94, 0.5)"; // Green
+      case "OCCUPIED": return "rgba(239, 68, 68, 0.5)"; // Red
+      case "OOS": return "rgba(107, 114, 128, 0.5)"; // Grey
       default: return "transparent";
     }
   };
 
   const getPolygonStroke = (roomId: string) => {
      const isSelected = selectedRoomId === roomId;
-     if (isSelected) return "#2563eb";
-     return "#9ca3af";
+     const state = states.find(s => s.roomId === roomId)?.status || "FREE";
+
+     if (isSelected) return "#2563eb"; // Blue-600
+
+     switch (state) {
+      case "FREE": return "#15803d"; // Green-700
+      case "OCCUPIED": return "#b91c1c"; // Red-700
+      case "OOS": return "#374151"; // Gray-700
+      default: return "#9ca3af";
+     }
+  };
+
+  const existingPolygon = selectedRoomId ? polygons.find(p => p.roomId === selectedRoomId) : null;
+
+  const handleBackgroundClick = (e: React.MouseEvent) => {
+    // Only trigger if we clicked directly on the SVG or a background rect, not on a child
+    if (e.target === e.currentTarget && onBackgroundClick) {
+        onBackgroundClick();
+    }
   };
 
   return (
@@ -88,31 +114,19 @@ export default function FloorPlan({
         
         {/* SVG Overlay */}
         <svg
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-auto"
           width="100%"
           height="100%"
-          // We use standard coordinates; viewBox matches pixel size of overlay for simplicity
-          // or we could use a fixed viewBox. For drawing simplicity, 1:1 pixel mapping is easiest.
-          // However, if we resize, we need to handle that. 
-          // The best approach for responsive drawings is to use a fixed viewBox (e.g. original image dimensions).
-          // Since we don't know original image dims, we rely on the implementation to save absolute coords 
-          // relative to current view or normalized. 
-          // For MVP: We assume the user draws on the screen and we save those coords. 
-          // CAUTION: If the image resizes (responsive), absolute coords will break.
-          // OPTION: convert to % or use generic 1000x1000 coordinate system.
-          // DECISION: To keep MVP simple, we will assume fixed viewBox 1000x1000 and simple transforms?
-          // NO, simpler: Render SVG with no viewBox (pixel coords) but rely on `getSvgCoordinates` which handles CTM.
-          // Re-drawing on resize will be an issue if we don't use viewBox.
-          // FIX: scaling.
           viewBox={dimensions.width > 0 ? `0 0 ${dimensions.width} ${dimensions.height}` : undefined}
           style={{ pointerEvents: editMode ? "all" : "none" }}
+          onClick={handleBackgroundClick}
         >
+          {/* Background capture layer */}
+          <rect width="100%" height="100%" fill="transparent" />
           {/* Render Existing Polygons */}
           {polygons.map((poly) => {
-             // If we are editing this specific room strings
-             if (editMode && selectedRoomId === poly.roomId) return null; // Don't show the saved one if we are editing it? 
-             // Actually, if we are editing, we usually want to start from scratch or edit handles. 
-             // The PolygonEditor takes `initialPoints`.
+             // If we are editing this specific room AND in drawing mode, hide the old polygon so we can redraw it
+             if (editMode && drawingMode && selectedRoomId === poly.roomId) return null; 
              
              const pointsStr = poly.points.map(p => `${p.x},${p.y}`).join(" ");
              return (
@@ -141,23 +155,41 @@ export default function FloorPlan({
           })}
 
           {/* Editor Overlay */}
-          {editMode && selectedRoomId && (
+          {editMode && selectedRoomId && drawingMode && (
             <PolygonEditor
               roomId={selectedRoomId}
-              initialPoints={polygons.find(p => p.roomId === selectedRoomId)?.points}
-              onSave={onPolygonSave}
-              onCancel={() => {}} // User can just click away or click "Undo" inside editor
+              initialPoints={existingPolygon?.points} // Optional: Start with existing points if we want to edit instead of redraw
+              onSave={(points) => {
+                  onPolygonSave(points);
+                  setDrawingMode(false);
+              }}
+              onCancel={() => setDrawingMode(false)}
             />
           )}
         </svg>
+
+        {/* Start Drawing / Edit Button Overlay */}
+        {editMode && selectedRoomId && !drawingMode && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                <button 
+                    onClick={() => setDrawingMode(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all font-medium animate-in fade-in zoom-in duration-200"
+                >
+                    {existingPolygon ? <Pencil size={16} /> : <Plus size={16} />}
+                    {existingPolygon ? "Redraw Shape" : "Draw Shape"}
+                </button>
+            </div>
+        )}
       </div>
       
       {/* Help text */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 px-4 py-2 rounded-full shadow text-sm font-medium z-10 pointer-events-none">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 px-4 py-2 rounded-full shadow text-sm font-medium z-10 pointer-events-none backdrop-blur-sm border border-gray-100">
         {editMode 
           ? selectedRoomId 
-             ? "Edit Mode: Draw polygon (Click to add points, Drag handles)" 
-             : "Edit Mode: Select a room to map"
+             ? drawingMode 
+                ? "Drawing Mode: Click to add points. Click start to close."
+                : `Selected: ${rooms.find(r => r.id === selectedRoomId)?.label || selectedRoomId}` 
+             : "Edit Mode: Select a room from the list to map"
           : "View Mode: Click rooms to see details"}
       </div>
     </div>

@@ -179,6 +179,7 @@ export default function Home() {
           editMode={editMode}
           onPolygonSave={handleSavePolygon}
           onRoomSelect={handleRoomSelect}
+          onBackgroundClick={() => setSelectedRoomId(null)}
         />
       </div>
 

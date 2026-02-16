@@ -25,8 +25,14 @@ export default function RoomModal({ room, currentState, onSave, onClose }: RoomM
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-96 max-w-full m-4 overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl w-96 max-w-full m-4 overflow-hidden cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="font-bold text-lg">Room {room.label}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={20} /></button>
