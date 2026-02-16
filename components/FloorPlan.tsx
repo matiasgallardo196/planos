@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Room, RoomState, Polygon, Point } from "@/lib/storage";
+import { Room, Point } from "@/types";
 import PolygonEditor from "./PolygonEditor";
 import { clsx } from "clsx";
 import { Pencil, Plus } from "lucide-react";
@@ -9,8 +9,6 @@ import { Pencil, Plus } from "lucide-react";
 interface FloorPlanProps {
   imageSrc: string;
   rooms: Room[];
-  polygons: Polygon[];
-  states: RoomState[];
   selectedRoomId: string | null;
   editMode: boolean; // boolean: true = EDIT, false = VIEW
   onPolygonSave: (points: Point[]) => void;
@@ -21,8 +19,6 @@ interface FloorPlanProps {
 export default function FloorPlan({
   imageSrc,
   rooms,
-  polygons,
-  states,
   selectedRoomId,
   editMode,
   onPolygonSave,
@@ -60,9 +56,9 @@ export default function FloorPlan({
   }, [selectedRoomId, editMode]);
 
 
-  const getPolygonColor = (roomId: string) => {
-    const isSelected = selectedRoomId === roomId;
-    const state = states.find(s => s.roomId === roomId)?.status || "FREE";
+  const getPolygonColor = (room: Room) => {
+    const isSelected = selectedRoomId === room.id;
+    const state = (room.status || "FREE").toUpperCase();
     
     if (isSelected) return "rgba(59, 130, 246, 0.6)"; // Blue (Selected)
     
@@ -74,9 +70,9 @@ export default function FloorPlan({
     }
   };
 
-  const getPolygonStroke = (roomId: string) => {
-     const isSelected = selectedRoomId === roomId;
-     const state = states.find(s => s.roomId === roomId)?.status || "FREE";
+  const getPolygonStroke = (room: Room) => {
+     const isSelected = selectedRoomId === room.id;
+     const state = (room.status || "FREE").toUpperCase();
 
      if (isSelected) return "#2563eb"; // Blue-600
 
@@ -88,7 +84,8 @@ export default function FloorPlan({
      }
   };
 
-  const existingPolygon = selectedRoomId ? polygons.find(p => p.roomId === selectedRoomId) : null;
+  const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+  const existingPoints = selectedRoom?.polygon;
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
     // Only trigger if we clicked directly on the SVG or a background rect, not on a child
@@ -124,30 +121,31 @@ export default function FloorPlan({
           {/* Background capture layer */}
           <rect width="100%" height="100%" fill="transparent" />
           {/* Render Existing Polygons */}
-          {polygons.map((poly) => {
+          {rooms.map((room) => {
+             if (!room.polygon || room.polygon.length === 0) return null;
              // If we are editing this specific room AND in drawing mode, hide the old polygon so we can redraw it
-             if (editMode && drawingMode && selectedRoomId === poly.roomId) return null; 
+             if (editMode && drawingMode && selectedRoomId === room.id) return null; 
              
-             const pointsStr = poly.points.map(p => `${p.x},${p.y}`).join(" ");
+             const pointsStr = room.polygon.map(p => `${p.x},${p.y}`).join(" ");
              return (
                <polygon
-                 key={poly.roomId}
+                 key={room.id}
                  points={pointsStr}
-                 fill={getPolygonColor(poly.roomId)}
-                 stroke={getPolygonStroke(poly.roomId)}
+                 fill={getPolygonColor(room)}
+                 stroke={getPolygonStroke(room)}
                  strokeWidth="2"
                  className={clsx("transition-all", !editMode && "cursor-pointer hover:opacity-80 pointer-events-auto")}
                  onClick={(e) => {
                     if (!editMode) {
                         e.stopPropagation();
-                        onRoomSelect(poly.roomId);
+                        onRoomSelect(room.id);
                     }
                  }}
                >
                  {!editMode && (
                     <title>
-                        {rooms.find(r=>r.id===poly.roomId)?.label} - {states.find(s=>s.roomId===poly.roomId)?.status}
-                         {states.find(s=>s.roomId===poly.roomId)?.occupantName ? ` (${states.find(s=>s.roomId===poly.roomId)?.occupantName})` : ''}
+                        {room.label} - {room.status}
+                         {room.occupants && room.occupants.length > 0 ? ` (${room.occupants[0].name})` : ''}
                     </title>
                  )}
                </polygon>
@@ -158,7 +156,7 @@ export default function FloorPlan({
           {editMode && selectedRoomId && drawingMode && (
             <PolygonEditor
               roomId={selectedRoomId}
-              initialPoints={existingPolygon?.points} // Optional: Start with existing points if we want to edit instead of redraw
+              initialPoints={existingPoints || undefined} // Optional: Start with existing points if we want to edit instead of redraw
               onSave={(points) => {
                   onPolygonSave(points);
                   setDrawingMode(false);
@@ -175,8 +173,8 @@ export default function FloorPlan({
                     onClick={() => setDrawingMode(true)}
                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all font-medium animate-in fade-in zoom-in duration-200"
                 >
-                    {existingPolygon ? <Pencil size={16} /> : <Plus size={16} />}
-                    {existingPolygon ? "Redraw Shape" : "Draw Shape"}
+                    {existingPoints && existingPoints.length > 0 ? <Pencil size={16} /> : <Plus size={16} />}
+                    {existingPoints && existingPoints.length > 0 ? "Redraw Shape" : "Draw Shape"}
                 </button>
             </div>
         )}
@@ -195,3 +193,5 @@ export default function FloorPlan({
     </div>
   );
 }
+
+

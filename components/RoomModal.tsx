@@ -1,26 +1,21 @@
 "use client";
 
-import { Room, RoomState } from "@/lib/storage";
+import { Room, RoomStatus } from "@/types";
 import { useState } from "react";
 import { X } from "lucide-react";
 
 interface RoomModalProps {
   room: Room;
-  currentState?: RoomState;
-  onSave: (state: RoomState) => void;
+  onSave: (roomId: string, status: RoomStatus, occupantName?: string) => void;
   onClose: () => void;
 }
 
-export default function RoomModal({ room, currentState, onSave, onClose }: RoomModalProps) {
-  const [status, setStatus] = useState<RoomState["status"]>(currentState?.status || "FREE");
-  const [occupantName, setOccupantName] = useState(currentState?.occupantName || "");
+export default function RoomModal({ room, onSave, onClose }: RoomModalProps) {
+  const [status, setStatus] = useState<RoomStatus>(room.status || "FREE");
+  const [occupantName, setOccupantName] = useState((room.occupants && room.occupants.length > 0 && room.occupants[0].name) || "");
 
   const handleSave = () => {
-    onSave({
-      roomId: room.id,
-      status,
-      occupantName: status === "OCCUPIED" ? occupantName : undefined,
-    });
+    onSave(room.id, status, status === "OCCUPIED" ? occupantName : undefined);
     onClose();
   };
 
@@ -81,3 +76,5 @@ export default function RoomModal({ room, currentState, onSave, onClose }: RoomM
     </div>
   );
 }
+
+

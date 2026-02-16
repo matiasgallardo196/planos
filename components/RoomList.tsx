@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Room, RoomState, Polygon } from "@/lib/storage";
+import { Room } from "@/types";
 import { Plus, Trash2, Download, Upload, Map, MapPinOff } from "lucide-react";
 import { clsx } from "clsx";
 
 interface RoomListProps {
   rooms: Room[];
-  polygons: Polygon[];
-  states: RoomState[];
   selectedRoomId: string | null;
   onSelectRoom: (id: string) => void;
-  onAddRoom: (id: string) => void;
+  onAddRoom: (label: string) => void;
   onDeleteRoom: (id: string) => void;
   onExport: () => void;
   onImport: (json: string) => void;
@@ -21,8 +19,6 @@ type Filter = "ALL" | "MAPPED" | "UNMAPPED" | "FREE" | "OCCUPIED" | "OOS";
 
 export default function RoomList({
   rooms,
-  polygons,
-  states,
   selectedRoomId,
   onSelectRoom,
   onAddRoom,
@@ -32,11 +28,11 @@ export default function RoomList({
 }: RoomListProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [search, setSearch] = useState("");
-  const [newRoomId, setNewRoomId] = useState("");
+  const [newRoomLabel, setNewRoomLabel] = useState("");
 
   const filteredRooms = rooms.filter((room) => {
-    const isMapped = polygons.some((p) => p.roomId === room.id);
-    const state = states.find((s) => s.roomId === room.id)?.status || "FREE";
+    const isMapped = !!room.polygon && room.polygon.length > 0;
+    const state = room.status || "FREE";
     const matchesSearch = room.label.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
@@ -88,21 +84,21 @@ export default function RoomList({
         <div className="flex gap-2">
            <input
             className="flex-1 px-3 py-2 border rounded text-sm"
-            placeholder="New Room ID"
-            value={newRoomId}
-            onChange={(e) => setNewRoomId(e.target.value)}
+            placeholder="New Room Label"
+            value={newRoomLabel}
+            onChange={(e) => setNewRoomLabel(e.target.value)}
             onKeyDown={(e) => {
-                if (e.key === 'Enter' && newRoomId) {
-                    onAddRoom(newRoomId);
-                    setNewRoomId("");
+                if (e.key === 'Enter' && newRoomLabel) {
+                    onAddRoom(newRoomLabel);
+                    setNewRoomLabel("");
                 }
             }}
           />
           <button
             onClick={() => {
-              if (newRoomId) {
-                onAddRoom(newRoomId);
-                setNewRoomId("");
+              if (newRoomLabel) {
+                onAddRoom(newRoomLabel);
+                setNewRoomLabel("");
               }
             }}
             className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -114,8 +110,9 @@ export default function RoomList({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {filteredRooms.map((room) => {
-          const isMapped = polygons.some((p) => p.roomId === room.id);
-          const state = states.find((s) => s.roomId === room.id);
+          const isMapped = !!room.polygon && room.polygon.length > 0;
+          const status = room.status || "FREE";
+          const occupantName = room.occupants && room.occupants.length > 0 ? room.occupants[0].name : null;
           
           return (
             <div
@@ -134,7 +131,7 @@ export default function RoomList({
                 <div>
                   <div className="font-medium text-gray-900">{room.label}</div>
                   <div className="text-xs text-gray-500">
-                    {state?.status || "FREE"} {state?.occupantName ? `(${state.occupantName})` : ""}
+                    {status} {occupantName ? `(${occupantName})` : ""}
                   </div>
                 </div>
               </div>
@@ -163,3 +160,5 @@ export default function RoomList({
     </div>
   );
 }
+
+
