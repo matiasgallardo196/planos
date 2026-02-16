@@ -24,7 +24,7 @@ export default function Home() {
   const [editMode, setEditMode] = useState(false); // false = VIEW, true = EDIT
   const [isModalOpen, setIsModalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [floorPlanSrc] = useState("/plano.png"); // Default
+  const [floorPlanSrc] = useState("https://res.cloudinary.com/dxhwv3byy/image/upload/v1771204343/plano_lug2rz.png"); // Default
 
   // Load Data
   useEffect(() => {
