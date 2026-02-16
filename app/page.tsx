@@ -189,7 +189,10 @@ export default function Home() {
           room={rooms.find(r => r.id === selectedRoomId)!}
           currentState={states.find(s => s.roomId === selectedRoomId)}
           onSave={handleSaveState}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedRoomId(null);
+          }}
         />
       )}
     </main>
