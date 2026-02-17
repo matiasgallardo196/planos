@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Room } from "@/types";
-import { Plus, Trash2, Download, Upload, Map, MapPinOff } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Map, MapPinOff, X } from "lucide-react";
 import { clsx } from "clsx";
 
 interface RoomListProps {
@@ -13,6 +13,8 @@ interface RoomListProps {
   onDeleteRoom: (id: string) => void;
   onExport: () => void;
   onImport: (json: string) => void;
+  className?: string;     // Allow overriding styles (width, position)
+  onClose?: () => void;   // Optional close handler for mobile drawer
 }
 
 type Filter = "ALL" | "MAPPED" | "UNMAPPED" | "FREE" | "OCCUPIED" | "OOS";
@@ -25,6 +27,8 @@ export default function RoomList({
   onDeleteRoom,
   onExport,
   onImport,
+  className,
+  onClose,
 }: RoomListProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [search, setSearch] = useState("");
@@ -53,13 +57,20 @@ export default function RoomList({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200 w-80">
+    <div className={clsx("flex flex-col h-full bg-gray-50 border-r border-gray-200 w-80 md:w-80", className)}>
       <div className="p-4 border-b border-gray-200 bg-white">
-        <h2 className="text-lg font-bold mb-4">Rooms</h2>
+        <div className="flex justify-between items-center mb-4">
+           <h2 className="text-lg font-bold">Rooms</h2>
+           {onClose && (
+             <button onClick={onClose} className="md:hidden p-1 hover:bg-gray-100 rounded-full">
+               <X size={20} />
+             </button>
+           )}
+        </div>
         
         <div className="flex gap-2 mb-4">
           <input
-            className="flex-1 px-3 py-2 border rounded text-sm"
+            className="flex-1 px-3 py-2 border rounded text-sm min-w-0" // min-w-0 prevents input from overflowing flex container
             placeholder="Search rooms..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -83,7 +94,7 @@ export default function RoomList({
 
         <div className="flex gap-2">
            <input
-            className="flex-1 px-3 py-2 border rounded text-sm"
+            className="flex-1 px-3 py-2 border rounded text-sm min-w-0"
             placeholder="New Room Label"
             value={newRoomLabel}
             onChange={(e) => setNewRoomLabel(e.target.value)}
@@ -101,7 +112,7 @@ export default function RoomList({
                 setNewRoomLabel("");
               }
             }}
-            className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="p-2 bg-green-600 text-white rounded hover:bg-green-700 shrink-0"
           >
             <Plus size={16} />
           </button>
@@ -126,11 +137,11 @@ export default function RoomList({
                 !isMapped && "opacity-75"
               )}
             >
-              <div className="flex items-center gap-3">
-                 {isMapped ? <Map size={16} className="text-green-500" /> : <MapPinOff size={16} className="text-gray-400" />}
-                <div>
-                  <div className="font-medium text-gray-900">{room.label}</div>
-                  <div className="text-xs text-gray-500">
+              <div className="flex items-center gap-3 overflow-hidden">
+                 {isMapped ? <Map size={16} className="text-green-500 shrink-0" /> : <MapPinOff size={16} className="text-gray-400 shrink-0" />}
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 truncate">{room.label}</div>
+                  <div className="text-xs text-gray-500 truncate">
                     {status} {occupantName ? `(${occupantName})` : ""}
                   </div>
                 </div>
@@ -140,7 +151,7 @@ export default function RoomList({
                   e.stopPropagation();
                   if(confirm(`Delete room ${room.label}?`)) onDeleteRoom(room.id);
                 }}
-                className="text-gray-400 hover:text-red-500 p-1"
+                className="text-gray-400 hover:text-red-500 p-1 shrink-0"
               >
                 <Trash2 size={14} />
               </button>

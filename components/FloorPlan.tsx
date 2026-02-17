@@ -26,21 +26,21 @@ export default function FloorPlan({
   onBackgroundClick,
 }: FloorPlanProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [drawingMode, setDrawingMode] = useState(false);
 
-  // Handle resizing to keep SVG in sync with Image
+  // Track natural image dimensions — these define our coordinate system
   useEffect(() => {
     const updateDimensions = () => {
-      if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        setDimensions({ width: clientWidth, height: clientHeight });
+      const img = containerRef.current?.querySelector("img");
+      if (img && img.naturalWidth) {
+        setNaturalDimensions({ width: img.naturalWidth, height: img.naturalHeight });
       }
     };
 
+    // We still listen to resize to trigger re-renders if needed
     window.addEventListener("resize", updateDimensions);
     
-    // Initial load might need a delay for image
     const img = containerRef.current?.querySelector("img");
     if (img) {
       if (img.complete) updateDimensions();
@@ -95,103 +95,106 @@ export default function FloorPlan({
   };
 
   return (
-    <div className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-8 relative">
+    <div className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-2 md:p-8 relative min-h-full">
        <div 
-        ref={containerRef}
-        className="relative shadow-xl border-4 border-white bg-white inline-block max-w-full"
-        style={{ minWidth: "100px", minHeight: "100px" }} // Prevent collapse
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageSrc}
-          alt="Floor Plan"
-          className="block max-w-full h-auto"
-          draggable={false}
-        />
-        
-        {/* SVG Overlay */}
-        <svg
-          className="absolute inset-0 pointer-events-auto"
-          width="100%"
-          height="100%"
-          viewBox={dimensions.width > 0 ? `0 0 ${dimensions.width} ${dimensions.height}` : undefined}
-          style={{ pointerEvents: editMode ? "all" : "none" }}
-          onClick={handleBackgroundClick}
-        >
-          {/* Background capture layer */}
-          <rect width="100%" height="100%" fill="transparent" />
-          {/* Render Existing Polygons */}
-          {rooms.map((room) => {
-             if (!room.polygon || room.polygon.length === 0) return null;
-             // If we are editing this specific room AND in drawing mode, hide the old polygon so we can redraw it
-             if (editMode && drawingMode && selectedRoomId === room.id) return null; 
-             
-             const pointsStr = room.polygon.map(p => `${p.x},${p.y}`).join(" ");
-             return (
-               <polygon
-                 key={room.id}
-                 points={pointsStr}
-                 fill={getPolygonColor(room)}
-                 stroke={getPolygonStroke(room)}
-                 strokeWidth="2"
-                 className={clsx("transition-all", !editMode && "cursor-pointer hover:opacity-80 pointer-events-auto")}
-                 onClick={(e) => {
-                    if (!editMode) {
-                        e.stopPropagation();
-                        onRoomSelect(room.id);
-                    }
-                 }}
-               >
-                 {!editMode && (
-                    <title>
-                        {room.label} - {room.status}
-                         {room.occupants && room.occupants.length > 0 ? ` (${room.occupants[0].name})` : ''}
-                    </title>
-                 )}
-               </polygon>
-             )
-          })}
-
-          {/* Editor Overlay */}
-          {editMode && selectedRoomId && drawingMode && (
-            <PolygonEditor
-              roomId={selectedRoomId}
-              initialPoints={existingPoints || undefined} // Optional: Start with existing points if we want to edit instead of redraw
-              onSave={(points) => {
-                  onPolygonSave(points);
-                  setDrawingMode(false);
-              }}
-              onCancel={() => setDrawingMode(false)}
-            />
-          )}
-        </svg>
-
-        {/* Start Drawing / Edit Button Overlay */}
-        {editMode && selectedRoomId && !drawingMode && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <button 
-                    onClick={() => setDrawingMode(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all font-medium animate-in fade-in zoom-in duration-200"
+         ref={containerRef}
+         className="relative shadow-xl border-4 border-white bg-white inline-block max-w-full"
+         style={{ minWidth: "100px", minHeight: "100px" }} // Prevent collapse
+       >
+         {/* eslint-disable-next-line @next/next/no-img-element */}
+         <img
+           src={imageSrc}
+           alt="Floor Plan"
+           className="block max-w-full h-auto"
+           draggable={false}
+         />
+         
+         {/* SVG Overlay — viewBox uses NATURAL image dimensions so SVG auto-scales */}
+         <svg
+           className="absolute inset-0 pointer-events-auto"
+           width="100%"
+           height="100%"
+           viewBox={naturalDimensions.width > 0 ? `0 0 ${naturalDimensions.width} ${naturalDimensions.height}` : undefined}
+           preserveAspectRatio="none"
+           style={{ pointerEvents: editMode ? "all" : "none" }}
+           onClick={handleBackgroundClick}
+         >
+           {/* Background capture layer */}
+           <rect width="100%" height="100%" fill="transparent" />
+           {/* Render Existing Polygons — points are in natural image space, SVG scales them */}
+           {rooms.map((room) => {
+              if (!room.polygon || room.polygon.length === 0) return null;
+              // If we are editing this specific room AND in drawing mode, hide the old polygon so we can redraw it
+              if (editMode && drawingMode && selectedRoomId === room.id) return null; 
+              
+              // Points stored in natural coords render directly — SVG viewBox handles scaling
+              const pointsStr = room.polygon.map(p => `${p.x},${p.y}`).join(" ");
+              return (
+                <polygon
+                  key={room.id}
+                  points={pointsStr}
+                  fill={getPolygonColor(room)}
+                  stroke={getPolygonStroke(room)}
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                  className={clsx("transition-all", !editMode && "cursor-pointer hover:opacity-80 pointer-events-auto")}
+                  onClick={(e) => {
+                     if (!editMode) {
+                         e.stopPropagation();
+                         onRoomSelect(room.id);
+                     }
+                  }}
                 >
-                    {existingPoints && existingPoints.length > 0 ? <Pencil size={16} /> : <Plus size={16} />}
-                    {existingPoints && existingPoints.length > 0 ? "Redraw Shape" : "Draw Shape"}
-                </button>
-            </div>
-        )}
-      </div>
-      
-      {/* Help text */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 px-4 py-2 rounded-full shadow text-sm font-medium z-10 pointer-events-none backdrop-blur-sm border border-gray-100">
-        {editMode 
-          ? selectedRoomId 
-             ? drawingMode 
-                ? "Drawing Mode: Click to add points. Click start to close."
-                : `Selected: ${rooms.find(r => r.id === selectedRoomId)?.label || selectedRoomId}` 
-             : "Edit Mode: Select a room from the list to map"
-          : "View Mode: Click rooms to see details"}
-      </div>
-    </div>
-  );
-}
+                  {!editMode && (
+                     <title>
+                         {room.label} - {room.status}
+                          {room.occupants && room.occupants.length > 0 ? ` (${room.occupants[0].name})` : ''}
+                     </title>
+                  )}
+                </polygon>
+              )
+           })}
 
+           {/* Editor Overlay — getSvgCoordinates uses getScreenCTM().inverse() which
+                automatically maps screen clicks to viewBox (natural) coordinate space */}
+           {editMode && selectedRoomId && drawingMode && (
+             <PolygonEditor
+               roomId={selectedRoomId}
+               initialPoints={existingPoints || undefined}
+               onSave={(points) => {
+                   // Points are already in natural image coords thanks to viewBox
+                   onPolygonSave(points);
+                   setDrawingMode(false);
+               }}
+               onCancel={() => setDrawingMode(false)}
+             />
+           )}
+         </svg>
 
+         {/* Start Drawing / Edit Button Overlay */}
+         {editMode && selectedRoomId && !drawingMode && (
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                 <button 
+                     onClick={() => setDrawingMode(true)}
+                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all font-medium animate-in fade-in zoom-in duration-200"
+                 >
+                     {existingPoints && existingPoints.length > 0 ? <Pencil size={16} /> : <Plus size={16} />}
+                     {existingPoints && existingPoints.length > 0 ? "Redraw Shape" : "Draw Shape"}
+                 </button>
+             </div>
+         )}
+       </div>
+       
+       {/* Help text */}
+       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 px-4 py-2 rounded-full shadow text-xs md:text-sm font-medium z-10 pointer-events-none backdrop-blur-sm border border-gray-100 max-w-[90%] text-center">
+         {editMode 
+           ? selectedRoomId 
+              ? drawingMode 
+                 ? "Drawing Mode: Click to add points. Click start to close."
+                 : `Selected: ${rooms.find(r => r.id === selectedRoomId)?.label || selectedRoomId}` 
+              : "Edit Mode: Select a room from the list to map"
+           : "View Mode: Click rooms to see details"}
+       </div>
+     </div>
+   );
+ }

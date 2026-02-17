@@ -6,7 +6,7 @@ import FloorPlan from "@/components/FloorPlan";
 import RoomModal from "@/components/RoomModal";
 import api from "@/lib/api";
 import { Hotel, Room, RoomStatus, Point } from "@/types";
-import { Pencil, Eye, ArrowLeft } from "lucide-react";
+import { Pencil, Eye, ArrowLeft, Menu } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -21,6 +21,7 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false); // false = VIEW, true = EDIT
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Load Data
@@ -119,26 +120,53 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
 
   return (
     <main className="flex h-screen w-screen overflow-hidden">
-      {/* Sidebar */}
-      <RoomList
-        rooms={rooms}
-        selectedRoomId={selectedRoomId}
-        onSelectRoom={handleRoomSelect}
-        onAddRoom={handleAddRoom}
-        onDeleteRoom={handleDeleteRoom}
-        onExport={handleExport}
-        onImport={handleImport}
-      />
+      {/* Sidebar - Desktop: Static, Mobile: Drawer */}
+      <div 
+        className={`fixed inset-y-0 left-0 z-50 transform ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:relative md:translate-x-0 transition-transform duration-300 ease-in-out shadow-xl md:shadow-none`}
+      >
+        <RoomList
+          rooms={rooms}
+          selectedRoomId={selectedRoomId}
+          onSelectRoom={(id) => {
+             handleRoomSelect(id);
+             // On mobile, close sidebar after selection if you want, or keep open. 
+             // Let's keep it open for now as they might want to select multiple or just see details.
+             // Actually, usually you want to see the map after selecting.
+             if (window.innerWidth < 768) setIsSidebarOpen(false); 
+          }}
+          onAddRoom={handleAddRoom}
+          onDeleteRoom={handleDeleteRoom}
+          onExport={handleExport}
+          onImport={handleImport}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </div>
+      
+      {/* Overlay for mobile drawer */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col relative">
+      <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden">
         {/* Toolbar */}
-        <div className="h-14 border-b bg-white flex items-center justify-between px-4 z-20 shadow-sm">
+        <div className="h-14 border-b bg-white flex items-center justify-between px-4 z-20 shadow-sm shrink-0">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+             <button 
+               className="md:hidden p-2 -ml-2 hover:bg-gray-100 rounded-full text-gray-600"
+               onClick={() => setIsSidebarOpen(true)}
+             >
+               <Menu size={24} />
+             </button>
+            <Link href="/" className="p-2 hover:bg-gray-100 rounded-full transition-colors hidden md:block">
                 <ArrowLeft size={20} className="text-gray-600" />
             </Link>
-            <h1 className="font-bold text-xl">{hotel.name}</h1>
+            <h1 className="font-bold text-lg md:text-xl truncate max-w-[150px] md:max-w-none">{hotel.name}</h1>
           </div>
           
           <div className="flex items-center gap-4">
@@ -146,30 +174,32 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
             <div className="bg-gray-100 p-1 rounded-lg flex">
               <button
                 onClick={() => setEditMode(false)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${!editMode ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${!editMode ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                <Eye size={16} /> View
+                <Eye size={16} /> <span className="hidden md:inline">View</span>
               </button>
               <button
                 onClick={() => setEditMode(true)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${editMode ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${editMode ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                <Pencil size={16} /> Edit
+                <Pencil size={16} /> <span className="hidden md:inline">Edit</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Workspace */}
-        <FloorPlan
-          imageSrc={hotel.floorPlanUrl}
-          rooms={rooms}
-          selectedRoomId={selectedRoomId}
-          editMode={editMode}
-          onPolygonSave={handleSavePolygon}
-          onRoomSelect={handleRoomSelect}
-          onBackgroundClick={() => setSelectedRoomId(null)}
-        />
+        <div className="flex-1 overflow-auto relative">
+            <FloorPlan
+              imageSrc={hotel.floorPlanUrl}
+              rooms={rooms}
+              selectedRoomId={selectedRoomId}
+              editMode={editMode}
+              onPolygonSave={handleSavePolygon}
+              onRoomSelect={handleRoomSelect}
+              onBackgroundClick={() => setSelectedRoomId(null)}
+            />
+        </div>
       </div>
 
       {/* Modal */}
