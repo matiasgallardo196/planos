@@ -6,7 +6,7 @@ import FloorPlan from "@/components/FloorPlan";
 import RoomModal from "@/components/RoomModal";
 import api from "@/lib/api";
 import { Hotel, Room, RoomStatus, Point } from "@/types";
-import { Pencil, Eye, ArrowLeft, Menu } from "lucide-react";
+import { Pencil, Eye, ArrowLeft, Menu, Tag, Tags } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -22,6 +22,7 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
   const [editMode, setEditMode] = useState(false); // false = VIEW, true = EDIT
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Load Data
@@ -185,6 +186,20 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
                 <Pencil size={16} /> <span className="hidden md:inline">Edit</span>
               </button>
             </div>
+
+             {/* Labels Toggle */}
+             <button
+               onClick={() => setShowLabels(!showLabels)}
+               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all border ${
+                 showLabels 
+                   ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                   : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'
+               }`}
+               title={showLabels ? 'Hide labels' : 'Show labels'}
+             >
+               {showLabels ? <Tag size={16} /> : <Tags size={16} />}
+               <span className="hidden md:inline">{showLabels ? 'Labels' : 'Labels'}</span>
+             </button>
           </div>
         </div>
 
@@ -195,6 +210,7 @@ export default function HotelEditor({ params }: { params: Promise<{ id: string }
               rooms={rooms}
               selectedRoomId={selectedRoomId}
               editMode={editMode}
+              showLabels={showLabels}
               onPolygonSave={handleSavePolygon}
               onRoomSelect={handleRoomSelect}
               onBackgroundClick={() => setSelectedRoomId(null)}

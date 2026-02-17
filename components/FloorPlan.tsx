@@ -11,6 +11,7 @@ interface FloorPlanProps {
   rooms: Room[];
   selectedRoomId: string | null;
   editMode: boolean; // boolean: true = EDIT, false = VIEW
+  showLabels: boolean;
   onPolygonSave: (points: Point[]) => void;
   onRoomSelect: (roomId: string) => void;
   onBackgroundClick?: () => void;
@@ -21,6 +22,7 @@ export default function FloorPlan({
   rooms,
   selectedRoomId,
   editMode,
+  showLabels,
   onPolygonSave,
   onRoomSelect,
   onBackgroundClick,
@@ -129,29 +131,116 @@ export default function FloorPlan({
               
               // Points stored in natural coords render directly — SVG viewBox handles scaling
               const pointsStr = room.polygon.map(p => `${p.x},${p.y}`).join(" ");
+
+              // Calculate center for text label
+              const xInfo = room.polygon.reduce((acc, p) => ({ 
+                  min: Math.min(acc.min, p.x), 
+                  max: Math.max(acc.max, p.x) 
+              }), { min: Infinity, max: -Infinity });
+              const yInfo = room.polygon.reduce((acc, p) => ({ 
+                  min: Math.min(acc.min, p.y), 
+                  max: Math.max(acc.max, p.y) 
+              }), { min: Infinity, max: -Infinity });
+              
+              const centerX = (xInfo.min + xInfo.max) / 2;
+              const centerY = (yInfo.min + yInfo.max) / 2;
+
+              // Determine text content
+              let labelText = "Free";
+              const status = (room.status || "FREE").toUpperCase();
+              if (status === "OCCUPIED") {
+                  labelText = room.occupants && room.occupants.length > 0 ? room.occupants[0].name : "Occupied";
+              } else if (status === "OOS") {
+                  labelText = "OOS";
+              }
+
+              // Dynamic font size based on image width to keep labels readable
+              // default to 14, but scale up for large images (approx 1.5% of width)
+              const fontSize = Math.max(12, naturalDimensions.width / 60);
+
               return (
-                <polygon
-                  key={room.id}
-                  points={pointsStr}
-                  fill={getPolygonColor(room)}
-                  stroke={getPolygonStroke(room)}
-                  strokeWidth="2"
-                  vectorEffect="non-scaling-stroke"
-                  className={clsx("transition-all", !editMode && "cursor-pointer hover:opacity-80 pointer-events-auto")}
-                  onClick={(e) => {
-                     if (!editMode) {
-                         e.stopPropagation();
-                         onRoomSelect(room.id);
-                     }
-                  }}
-                >
-                  {!editMode && (
-                     <title>
-                         {room.label} - {room.status}
-                          {room.occupants && room.occupants.length > 0 ? ` (${room.occupants[0].name})` : ''}
-                     </title>
-                  )}
-                </polygon>
+                <g key={room.id}>
+                    <polygon
+                    points={pointsStr}
+                    fill={getPolygonColor(room)}
+                    stroke={getPolygonStroke(room)}
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                    className={clsx("transition-all", !editMode && "cursor-pointer hover:opacity-80 pointer-events-auto")}
+                    onClick={(e) => {
+                        if (!editMode) {
+                            e.stopPropagation();
+                            onRoomSelect(room.id);
+                        }
+                    }}
+                    >
+                    {!editMode && (
+                        <title>
+                            {room.label} - {room.status}
+                            {room.occupants && room.occupants.length > 0 ? ` (${room.occupants[0].name})` : ''}
+                        </title>
+                    )}
+                    </polygon>
+                    {/* Label with background pill — two lines: room name + status */}
+                    {!editMode && showLabels && (() => {
+                        const smallFont = fontSize * 0.75;
+                        const lineGap = fontSize * 0.3;
+                        const totalH = fontSize + smallFont + lineGap;
+                        const padX = fontSize * 0.6;
+                        const padY = fontSize * 0.4;
+                        const longerText = room.label.length > labelText.length ? room.label : labelText;
+                        const textWidth = longerText.length * fontSize * 0.5;
+                        const pillW = textWidth + padX * 2;
+                        const pillH = totalH + padY * 2;
+                        const rx = fontSize * 0.4;
+
+                        // Top line (room label) y position
+                        const topY = centerY - lineGap / 2 - smallFont / 2;
+                        // Bottom line (status) y position  
+                        const bottomY = centerY + lineGap / 2 + fontSize / 2;
+
+                        return (
+                          <g style={{ pointerEvents: "none" }}>
+                            <rect
+                              x={centerX - pillW / 2}
+                              y={centerY - pillH / 2}
+                              width={pillW}
+                              height={pillH}
+                              rx={rx}
+                              ry={rx}
+                              fill="rgba(0,0,0,0.7)"
+                            />
+                            {/* Room name */}
+                            <text
+                              x={centerX}
+                              y={topY}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fill="rgba(255,255,255,0.8)"
+                              fontSize={smallFont}
+                              fontWeight="500"
+                              fontFamily="system-ui, -apple-system, sans-serif"
+                            >
+                              {room.label}
+                            </text>
+                            {/* Status / Occupant */}
+                            <text
+                              x={centerX}
+                              y={bottomY}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fill="#fff"
+                              fontSize={fontSize}
+                              fontWeight="700"
+                              fontFamily="system-ui, -apple-system, sans-serif"
+                              letterSpacing="0.3"
+                            >
+                              {labelText}
+                            </text>
+                          </g>
+                        );
+                    })()}
+                </g>
               )
            })}
 
